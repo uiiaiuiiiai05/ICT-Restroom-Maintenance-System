@@ -81,11 +81,11 @@ export default function ReportPage() {
     'ชั้น 3': [
       'ห้องน้ำหญิง / ชั้น 3 โซน A',
       'ห้องน้ำหญิง / ชั้น 3 โซน B',
-      'ห้องน้ำหญิง / ชั้น 3 โซน C (ห้องน้ำชำรุดใช้งานไม่ได้)',
+      'ห้องน้ำหญิง / ชั้น 3 โซน C (มีการแจ้งซ่อมไปแล้ว)',
       'ห้องน้ำหญิง / ชั้น 3 โซน D (บริเวณห้องCITCOMS)',
       'ห้องน้ำชาย / ชั้น 3 โซน A',
       'ห้องน้ำชาย / ชั้น 3 โซน B',
-      'ห้องน้ำชาย / ชั้น 3 โซน C (ห้องน้ำชำรุดใช้งานไม่ได้)',
+      'ห้องน้ำชาย / ชั้น 3 โซน C (มีการแจ้งซ่อมไปแล้ว)',
       'ห้องน้ำชาย / ชั้น 3 โซน D (บริเวณห้องCITCOMS)'
     ],
     'ชั้น 4': [
@@ -220,6 +220,11 @@ export default function ReportPage() {
       return;
     }
 
+    if (noteText.trim().length > 100) {
+      setAlertMessage('หมายเหตุเพิ่มเติมต้องมีความยาวไม่เกิน 100 ตัวอักษร');
+      return;
+    }
+
     // ตรวจสอบใน database ว่ามีรายการนั้นที่เป็นสถานะ "รอรับเรื่อง" หรือ "เปิด/ปิดเป็น true" หรือไม่
     setIsSubmitting(true);
     try {
@@ -234,7 +239,11 @@ export default function ReportPage() {
           const mainExisting = itemSummary.split('- หมายเหตุ:')[0].trim();
           const isSameIssue = itemSummary.includes(cat) || cat.includes(mainExisting) || mainExisting === cat;
 
-          return isSameIssue && (item.status === 'รอรับเรื่อง' || item.is_repeat_blocked === true);
+          // บล็อกการแจ้งซ้ำหากมีรายการเดิมที่สถานะเป็น "รอรับเรื่อง", "รับเรื่อง", หรือ "กำลังซ่อมแซม" (สถานะ "ซ่อมเสร็จแล้ว" สามารถแจ้งได้)
+          const blockedStatuses = ['รอรับเรื่อง', 'รับเรื่อง', 'แจ้งแล้ว', 'กำลังซ่อมแซม', 'กำลังดำเนินการ'];
+          const isBlockedStatus = blockedStatuses.includes(item.status);
+
+          return isSameIssue && isBlockedStatus;
         });
 
         if (isDuplicate) {
@@ -365,8 +374,8 @@ export default function ReportPage() {
                       {activeFloor === floor && (
                         <div className="bg-white flex flex-col">
                           {locationHierarchy[floor].map((subItem, index) => {
-                            // 📍 เช็กเงื่อนไขห้องน้ำชำรุด
-                            const isBroken = subItem.includes('ห้องน้ำชำรุดใช้งานไม่ได้');
+                            // 📍 เช็กเงื่อนไขห้องน้ำที่ไม่สามารถแจ้งได้
+                            const isBroken = subItem.includes('มีการแจ้งซ่อมไปแล้ว') || subItem.includes('ห้องน้ำชำรุดใช้งานไม่ได้');
 
                             return (
                               <div
@@ -524,13 +533,22 @@ export default function ReportPage() {
               <span className="text-base font-extrabold text-black">เร่งด่วน</span>
             </label>
 
-            <input
-              type="text"
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="* หมายเหตุเพิ่มเติม"
-              className="w-full bg-white border border-black/30 rounded-2xl p-3.5 text-sm md:text-base text-black focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
-            />
+            <div>
+              <input
+                type="text"
+                maxLength={100}
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value.slice(0, 100))}
+                placeholder="* หมายเหตุเพิ่มเติม (ไม่เกิน 100 ตัวอักษร)"
+                className="w-full bg-white border border-black/30 rounded-2xl p-3.5 text-sm md:text-base text-black focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
+              />
+              <div className="flex justify-between items-center px-1 mt-1 text-xs text-gray-500">
+                <span>หมายเหตุเพิ่มเติม (ไม่บังคับ)</span>
+                <span className={noteText.length >= 100 ? 'text-red-500 font-bold' : 'text-gray-400 font-medium'}>
+                  {noteText.length}/100 ตัวอักษร
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* 5. ปุ่มส่งข้อมูล */}

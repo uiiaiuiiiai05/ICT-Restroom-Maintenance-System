@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
     const selectFields = includeImage
       ? '*'
-      : 'id,ticket_number,reported_at,location,issue_summary,priority,status,notification_message,notified_at,remark,line_user_id,is_repeat_blocked';
+      : 'id,ticket_number,reported_at,location,issue_summary,priority,status,notification_message,notified_at,remark,line_user_id';
 
     let endpoint = `${SUPABASE_URL}/rest/v1/maintenance_requests?select=${encodeURIComponent(selectFields)}&order=reported_at.desc`;
     if (lineUserId) {
@@ -66,10 +66,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // ตรวจสอบใน database ว่ามีรายการที่เป็นสถานะ "รอรับเรื่อง" หรือ is_repeat_blocked เป็น true หรือไม่
+    // ตรวจสอบใน database ว่ามีรายการที่เป็นสถานะ "รอรับเรื่อง", "รับเรื่อง", หรือ "กำลังซ่อมแซม" หรือไม่
     try {
       const checkRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/maintenance_requests?location=eq.${encodeURIComponent(location.trim())}&select=id,location,issue_summary,status,is_repeat_blocked`,
+        `${SUPABASE_URL}/rest/v1/maintenance_requests?location=eq.${encodeURIComponent(location.trim())}&select=id,location,issue_summary,status`,
         {
           headers: {
             apikey: SUPABASE_KEY,
@@ -93,7 +93,11 @@ export async function POST(request: Request) {
               incomingSummary.includes(mainExisting) ||
               mainIncoming === mainExisting;
 
-            return isSameIssue && (req.status === 'รอรับเรื่อง' || req.is_repeat_blocked === true);
+            // บล็อกการแจ้งซ้ำหากมีรายการเดิมที่สถานะเป็น "รอรับเรื่อง", "รับเรื่อง", หรือ "กำลังซ่อมแซม"
+            const blockedStatuses = ['รอรับเรื่อง', 'รับเรื่อง', 'แจ้งแล้ว', 'กำลังซ่อมแซม', 'กำลังดำเนินการ'];
+            const isBlockedStatus = blockedStatuses.includes(req.status);
+
+            return isSameIssue && isBlockedStatus;
           });
 
           if (isDuplicateBlocked) {

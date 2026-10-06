@@ -42,6 +42,7 @@ export default function StatusPage() {
   const [dateMode, setDateMode] = useState<'today' | 'all' | 'custom'>('today');
   const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDateStr());
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'received' | 'repairing' | 'completed'>('all');
 
   // แปลงข้อมูลจาก API เป็น TicketData
@@ -300,12 +301,27 @@ export default function StatusPage() {
     }
   };
 
-  // กรองรายการตามวันที่ค้นหา, คำค้นหา และสถานะ
+  // กรองรายการตามวันที่ค้นหา, สถานที่, คำค้นหา และสถานะ
   const filteredTickets = useMemo(() => {
     return tickets.filter((ticket) => {
       // กรองตามวันที่เลือก
       if (selectedDate && ticket.rawDateOnly !== selectedDate) {
         return false;
+      }
+
+      // กรองตามสถานที่
+      if (selectedLocation !== 'all') {
+        const norm = (s: string) =>
+          s
+            .replace(/\s+/g, '')
+            .replace(/\//g, '')
+            .replace(/\([^)]*\)/g, '')
+            .toLowerCase();
+        const ticketLocNorm = norm(ticket.location || '');
+        const targetLocNorm = norm(selectedLocation);
+        if (!ticketLocNorm.includes(targetLocNorm)) {
+          return false;
+        }
       }
 
       // กรองตามสถานะ
@@ -327,14 +343,20 @@ export default function StatusPage() {
 
       return true;
     });
-  }, [tickets, selectedDate, searchQuery, statusFilter]);
+  }, [tickets, selectedDate, selectedLocation, searchQuery, statusFilter]);
 
-  const isFiltering = Boolean((dateMode !== 'all' && selectedDate) || searchQuery.trim() || statusFilter !== 'all');
+  const isFiltering = Boolean(
+    (dateMode !== 'all' && selectedDate) ||
+    selectedLocation !== 'all' ||
+    searchQuery.trim() ||
+    statusFilter !== 'all'
+  );
 
   const handleClearFilters = () => {
     setDateMode('all');
     setSelectedDate('');
     setSearchQuery('');
+    setSelectedLocation('all');
     setStatusFilter('all');
   };
 
@@ -364,16 +386,14 @@ export default function StatusPage() {
             <button
               type="button"
               onClick={() => handleSelectDateMode('today')}
-              className={`py-2 px-2 rounded-lg font-extrabold text-xs md:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                dateMode === 'today'
+              className={`py-2 px-2 rounded-lg font-extrabold text-xs md:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${dateMode === 'today'
                   ? 'bg-[#6610A8] text-white shadow-sm'
                   : 'text-gray-700 hover:text-black hover:bg-purple-100/60'
-              }`}
+                }`}
             >
               <span>วันนี้</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                dateMode === 'today' ? 'bg-white/25 text-white' : 'bg-purple-200 text-[#6610A8]'
-              }`}>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${dateMode === 'today' ? 'bg-white/25 text-white' : 'bg-purple-200 text-[#6610A8]'
+                }`}>
                 {todayCount}
               </span>
             </button>
@@ -382,16 +402,14 @@ export default function StatusPage() {
             <button
               type="button"
               onClick={() => handleSelectDateMode('all')}
-              className={`py-2 px-2 rounded-lg font-extrabold text-xs md:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                dateMode === 'all'
+              className={`py-2 px-2 rounded-lg font-extrabold text-xs md:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${dateMode === 'all'
                   ? 'bg-[#6610A8] text-white shadow-sm'
                   : 'text-gray-700 hover:text-black hover:bg-purple-100/60'
-              }`}
+                }`}
             >
               <span>ทั้งหมด</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                dateMode === 'all' ? 'bg-white/25 text-white' : 'bg-purple-200 text-[#6610A8]'
-              }`}>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${dateMode === 'all' ? 'bg-white/25 text-white' : 'bg-purple-200 text-[#6610A8]'
+                }`}>
                 {tickets.length}
               </span>
             </button>
@@ -400,11 +418,10 @@ export default function StatusPage() {
             <button
               type="button"
               onClick={() => handleSelectDateMode('custom')}
-              className={`py-2 px-2 rounded-lg font-extrabold text-xs md:text-sm transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                dateMode === 'custom'
+              className={`py-2 px-2 rounded-lg font-extrabold text-xs md:text-sm transition-all flex items-center justify-center gap-1 cursor-pointer ${dateMode === 'custom'
                   ? 'bg-[#6610A8] text-white shadow-sm'
                   : 'text-gray-700 hover:text-black hover:bg-purple-100/60'
-              }`}
+                }`}
             >
               <span>ค้นหาวัน</span>
               {dateMode === 'custom' && selectedDate && (
@@ -453,34 +470,106 @@ export default function StatusPage() {
             </div>
           )}
 
-          {/* ช่องค้นหาข้อความ */}
-          <div className="relative flex items-center px-1">
-            <svg
-              className="w-4 h-4 text-[#6610A8] absolute left-3 pointer-events-none"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="ค้นหา (รหัสแจ้ง, สถานที่, หรือปัญหา...)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#FAF5FF] border border-[#B870E8] rounded-xl pl-9 pr-8 py-2 text-xs md:text-sm text-black font-medium focus:outline-none focus:ring-2 focus:ring-[#6610A8] transition-all"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 text-gray-400 hover:text-gray-700 text-sm font-bold p-1 cursor-pointer"
-                title="ล้างข้อความ"
+          {/* แถวการค้นหาและเลือกสถานที่ */}
+          <div className="flex flex-col sm:flex-row gap-2 px-1">
+            {/* Dropdown เลือกสถานที่ */}
+            <div className="sm:w-1/2 relative flex items-center">
+              <span className="w-4 h-4 text-[#6610A8] absolute left-3 pointer-events-none flex items-center justify-center text-xs">
+                📍
+              </span>
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="w-full bg-[#FAF5FF] border border-[#B870E8] rounded-xl pl-8 pr-7 py-2 text-xs md:text-sm text-black font-semibold focus:outline-none focus:ring-2 focus:ring-[#6610A8] transition-all cursor-pointer truncate"
+                title="เลือกสถานที่ห้องน้ำ"
               >
-                &times;
-              </button>
-            )}
+                <option value="all">📍 ทุกสถานที่ (ทั้งหมด)</option>
+
+                <optgroup label="── แยกตามชั้น ──">
+                  <option value="ชั้น 1">🏢 ทุกห้องใน ชั้น 1</option>
+                  <option value="ชั้น 2">🏢 ทุกห้องใน ชั้น 2</option>
+                  <option value="ชั้น 3">🏢 ทุกห้องใน ชั้น 3</option>
+                  <option value="ชั้น 4">🏢 ทุกห้องใน ชั้น 4</option>
+                </optgroup>
+
+                <optgroup label="── ชั้น 1 ──">
+                  <option value="ห้องน้ำหญิง / ชั้น 1 โซน A">ห้องน้ำหญิง / ชั้น 1 โซน A</option>
+                  <option value="ห้องน้ำหญิง / ชั้น 1 โซน B">ห้องน้ำหญิง / ชั้น 1 โซน B</option>
+                  <option value="ห้องน้ำชาย / ชั้น 1 โซน A">ห้องน้ำชาย / ชั้น 1 โซน A</option>
+                  <option value="ห้องน้ำชาย / ชั้น 1 โซน B">ห้องน้ำชาย / ชั้น 1 โซน B</option>
+                </optgroup>
+
+                <optgroup label="── ชั้น 2 ──">
+                  <option value="ห้องน้ำหญิง / ชั้น 2 โซน A">ห้องน้ำหญิง / ชั้น 2 โซน A</option>
+                  <option value="ห้องน้ำหญิง / ชั้น 2 โซน B">ห้องน้ำหญิง / ชั้น 2 โซน B</option>
+                  <option value="ห้องน้ำหญิง / ชั้น 2 โซน D">ห้องน้ำหญิง / ชั้น 2 โซน D (งานบริการเครือข่าย)</option>
+                  <option value="ห้องน้ำหญิง / ชั้น 2 โซน หอประชุมพะเยา">ห้องน้ำหญิง / ชั้น 2 โซน หอประชุมพะเยา</option>
+                  <option value="ห้องน้ำชาย / ชั้น 2 โซน A">ห้องน้ำชาย / ชั้น 2 โซน A</option>
+                  <option value="ห้องน้ำชาย / ชั้น 2 โซน B">ห้องน้ำชาย / ชั้น 2 โซน B</option>
+                  <option value="ห้องน้ำชาย / ชั้น 2 โซน D">ห้องน้ำชาย / ชั้น 2 โซน D (งานบริการเครือข่าย)</option>
+                  <option value="ห้องน้ำชาย / ชั้น 2 โซน หอประชุมพะเยา">ห้องน้ำชาย / ชั้น 2 โซน หอประชุมพะเยา</option>
+                </optgroup>
+
+                <optgroup label="── ชั้น 3 ──">
+                  <option value="ห้องน้ำหญิง / ชั้น 3 โซน A">ห้องน้ำหญิง / ชั้น 3 โซน A</option>
+                  <option value="ห้องน้ำหญิง / ชั้น 3 โซน B">ห้องน้ำหญิง / ชั้น 3 โซน B</option>
+                  <option value="ห้องน้ำหญิง / ชั้น 3 โซน C">ห้องน้ำหญิง / ชั้น 3 โซน C</option>
+                  <option value="ห้องน้ำหญิง / ชั้น 3 โซน D">ห้องน้ำหญิง / ชั้น 3 โซน D (CITCOMS)</option>
+                  <option value="ห้องน้ำชาย / ชั้น 3 โซน A">ห้องน้ำชาย / ชั้น 3 โซน A</option>
+                  <option value="ห้องน้ำชาย / ชั้น 3 โซน B">ห้องน้ำชาย / ชั้น 3 โซน B</option>
+                  <option value="ห้องน้ำชาย / ชั้น 3 โซน C">ห้องน้ำชาย / ชั้น 3 โซน C</option>
+                  <option value="ห้องน้ำชาย / ชั้น 3 โซน D">ห้องน้ำชาย / ชั้น 3 โซน D (CITCOMS)</option>
+                </optgroup>
+
+                <optgroup label="── ชั้น 4 ──">
+                  <option value="ห้องน้ำหญิง / ชั้น 4 โซน A">ห้องน้ำหญิง / ชั้น 4 โซน A</option>
+                  <option value="ห้องน้ำหญิง / ชั้น 4 โซน B">ห้องน้ำหญิง / ชั้น 4 โซน B</option>
+                  <option value="ห้องน้ำชาย / ชั้น 4 โซน A">ห้องน้ำชาย / ชั้น 4 โซน A</option>
+                  <option value="ห้องน้ำชาย / ชั้น 4 โซน B">ห้องน้ำชาย / ชั้น 4 โซน B</option>
+                </optgroup>
+              </select>
+
+              {selectedLocation !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedLocation('all')}
+                  className="absolute right-2 text-gray-400 hover:text-gray-700 text-xs font-bold px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded cursor-pointer"
+                  title="ล้างสถานที่"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+
+            {/* ช่องค้นหาข้อความ */}
+            <div className="sm:w-1/2 relative flex items-center">
+              <svg
+                className="w-4 h-4 text-[#6610A8] absolute left-3 pointer-events-none"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="ค้นหา (รหัสแจ้ง, ปัญหา...)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#FAF5FF] border border-[#B870E8] rounded-xl pl-9 pr-8 py-2 text-xs md:text-sm text-black font-medium focus:outline-none focus:ring-2 focus:ring-[#6610A8] transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3.5 text-gray-400 hover:text-gray-700 text-sm font-bold p-1 cursor-pointer"
+                  title="ล้างข้อความ"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
           </div>
 
           {/* แถวตัวกรองสถานะ */}
@@ -489,22 +578,20 @@ export default function StatusPage() {
             <button
               type="button"
               onClick={() => setStatusFilter('all')}
-              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 cursor-pointer ${
-                statusFilter === 'all'
+              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 cursor-pointer ${statusFilter === 'all'
                   ? 'bg-gray-800 text-white shadow-xs'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+                }`}
             >
               ทั้งหมด
             </button>
             <button
               type="button"
               onClick={() => setStatusFilter('pending')}
-              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-extrabold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
-                statusFilter === 'pending'
+              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-extrabold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${statusFilter === 'pending'
                   ? 'bg-[#e3dc01] text-black shadow-xs'
                   : 'bg-yellow-50 text-yellow-800 hover:bg-yellow-100 border border-yellow-200'
-              }`}
+                }`}
             >
               <span>รอรับเรื่อง</span>
               {pendingCount > 0 && <span className="text-[10px]">({pendingCount})</span>}
@@ -512,11 +599,10 @@ export default function StatusPage() {
             <button
               type="button"
               onClick={() => setStatusFilter('received')}
-              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
-                statusFilter === 'received'
+              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${statusFilter === 'received'
                   ? 'bg-[#2563EB] text-white shadow-xs'
                   : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200'
-              }`}
+                }`}
             >
               <span>รับเรื่อง</span>
               {receivedCount > 0 && <span className="text-[10px]">({receivedCount})</span>}
@@ -524,11 +610,10 @@ export default function StatusPage() {
             <button
               type="button"
               onClick={() => setStatusFilter('repairing')}
-              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
-                statusFilter === 'repairing'
+              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${statusFilter === 'repairing'
                   ? 'bg-[#D97706] text-white shadow-xs'
                   : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-              }`}
+                }`}
             >
               <span>กำลังซ่อมแซม</span>
               {repairingCount > 0 && <span className="text-[10px]">({repairingCount})</span>}
@@ -536,11 +621,10 @@ export default function StatusPage() {
             <button
               type="button"
               onClick={() => setStatusFilter('completed')}
-              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
-                statusFilter === 'completed'
+              className={`text-[11px] md:text-xs px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${statusFilter === 'completed'
                   ? 'bg-[#2E7D32] text-white shadow-xs'
                   : 'bg-green-50 text-green-800 hover:bg-green-100 border border-green-200'
-              }`}
+                }`}
             >
               <span>ซ่อมเสร็จแล้ว</span>
               {completedCount > 0 && <span className="text-[10px]">({completedCount})</span>}
@@ -560,15 +644,15 @@ export default function StatusPage() {
               <span className="truncate">
                 {dateMode === 'today' && 'รายการวันนี้'}
                 {dateMode === 'custom' && (selectedDate ? `วันที่ ${formatThaiDate(selectedDate)}` : 'ค้นหาวัน (ทั้งหมด)')}
-                {statusFilter !== 'all' && ` • ${
-                  statusFilter === 'pending'
+                {statusFilter !== 'all' && ` • ${statusFilter === 'pending'
                     ? 'รอรับเรื่อง'
                     : statusFilter === 'received'
-                    ? 'รับเรื่อง'
-                    : statusFilter === 'repairing'
-                    ? 'กำลังซ่อมแซม'
-                    : 'ซ่อมเสร็จแล้ว'
-                }`}
+                      ? 'รับเรื่อง'
+                      : statusFilter === 'repairing'
+                        ? 'กำลังซ่อมแซม'
+                        : 'ซ่อมเสร็จแล้ว'
+                  }`}
+                {selectedLocation !== 'all' && ` • 📍 ${selectedLocation}`}
                 {searchQuery && ` • "${searchQuery}"`}
                 {` (${filteredTickets.length} รายการ)`}
               </span>

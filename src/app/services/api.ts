@@ -34,7 +34,6 @@ export interface MaintenanceRequest {
   notification_message?: string | null;
   notified_at?: string | null;
   created_at?: string;
-  is_repeat_blocked?: boolean;
 }
 
 export interface RestroomStatus {
